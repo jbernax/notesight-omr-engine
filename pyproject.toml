@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "notesight-omr-engine"
+version = "0.1.0"
+description = "Standalone Optical Music Recognition (OMR) CLI and runner wrapping homr with staff bounding-box layout extraction and safety guards."
+readme = "README.md"
+license = { text = "AGPL-3.0-or-later" }
+requires-python = ">=3.10"
+dependencies = [
+    "homr>=0.7.0",
+    "numpy>=1.26.0",
+]
+
+[project.scripts]
+notesight-omr = "notesight_omr_engine.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
