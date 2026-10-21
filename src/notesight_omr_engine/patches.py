@@ -107,14 +107,56 @@ def safe_center_image_on_canvas(
     return new_image
 
 
-def apply_homr_safety_patches() -> bool:
-    """Bind runtime safety functions onto homr.staff_parsing in memory."""
+def smart_select_grandstaffs(self: Any, brace_dot: list[Any]) -> list[Any]:
+    """
+    Select GrandStaff pairs with musical engraving awareness.
+    In 3-staff systems (e.g. Solo/Descant + Choir accompaniment, or Voice + Piano),
+    the uppermost staff (index 0) is the solo/descant vocal line and the lower two staves
+    (indices 1 & 2) form the accompaniment / choral grandstaff.
+    """
     try:
+        from homr.model import MultiStaff
+
+        if len(self.staffs) == 3:
+            # Check if there is any brace/bracket touching the accompaniment pair [1, 2]
+            best_sc_12 = max(
+                (self._score_brace_with_staff_pair(sym, self.staffs[1], self.staffs[2]) for sym in brace_dot),
+                default=0.0,
+            )
+            if best_sc_12 > 0:
+                return [MultiStaff.GrandStaffPair([1, 2], best_sc_12)]
+    except Exception:
+        pass
+
+    pair_scores = []
+    for i in range(len(self.staffs) - 1):
+        best_score = max(
+            (self._score_brace_with_staff_pair(symbol, self.staffs[i], self.staffs[i + 1]) for symbol in brace_dot),
+            default=0.0,
+        )
+        if best_score > 0:
+            pair_scores.append(self.GrandStaffPair([i, i + 1], best_score))
+
+    result = []
+    used_staff_index: set[int] = set()
+    for pair in sorted(pair_scores, key=lambda p: p.get_score(), reverse=True):
+        if any(index in used_staff_index for index in pair.get_index()):
+            continue
+        result.append(pair)
+        used_staff_index.update(pair.get_index())
+    return result
+
+
+def apply_homr_safety_patches() -> bool:
+    """Bind runtime safety functions onto homr modules in memory."""
+    try:
+        import homr.model as hm
         import homr.staff_parsing as sp
 
         sp._calculate_region = safe_calculate_region  # type: ignore[attr-defined]
         sp.get_tr_omr_canvas_size = safe_get_tr_omr_canvas_size  # type: ignore[assignment]
         sp.center_image_on_canvas = safe_center_image_on_canvas  # type: ignore[assignment]
+        hm.MultiStaff._select_grandstaffs = smart_select_grandstaffs  # type: ignore[assignment]
         return True
     except Exception:
         return False
